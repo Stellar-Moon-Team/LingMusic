@@ -1,0 +1,198 @@
+@import "tailwindcss";
+
+/* 标语字体：本机装了 Blueaka 就直接用系统字体，否则加载裁剪过的子集（scripts/subset-font.py 生成） */
+@font-face {
+  font-family: "Blueaka";
+  src:
+    local("BlueakaBeta-DB-GBK"),
+    local("BlueakaBetaGBK DemiBold"),
+    url("/fonts/blueaka-subset.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@theme {
+  --font-title:
+    "Cormorant Garamond", "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --font-serif-cn: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  --font-slogan: "Blueaka", "Noto Serif SC", "Microsoft YaHei", sans-serif;
+  --font-hand: "Caveat", "Segoe Print", cursive;
+
+  /* 无衬线 / 现代 / UI */
+  --font-roboto: "Roboto", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-inter: "Inter", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-montserrat:
+    "Montserrat", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-poppins: "Poppins", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-raleway: "Raleway", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+
+  /* 圆润 / 柔和 */
+  --font-quicksand: "Quicksand", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+
+  /* 粗体 / 窄体 / 大写冲击 */
+  --font-oswald: "Oswald", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-bebas: "Bebas Neue", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+
+  /* 科技 / 未来感 */
+  --font-space: "Space Grotesk", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+
+  /* 衬线 / 优雅 / 标题 */
+  --font-playfair: "Playfair Display", "Noto Serif SC", "Songti SC", serif;
+  --font-lora: "Lora", "Noto Serif SC", "Songti SC", serif;
+  --font-merriweather: "Merriweather", "Noto Serif SC", "Songti SC", serif;
+  --font-dm-serif: "DM Serif Display", "Noto Serif SC", "Songti SC", serif;
+  --font-cormorant: "Cormorant Garamond", "Noto Serif SC", "Songti SC", serif;
+
+  /* 等宽 / 编程 */
+  --font-fira: "Fira Code", "Noto Sans Mono CJK SC", "Courier New", monospace;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  background: #05060d;
+  color: #fff;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * 主题文字色：由频谱主题的两端色（--c-from / --c-to，App 根元素上设置）
+ * 掺一点白得到，深色主题下文字也保持可读。
+ */
+.theme-root {
+  --t-from: color-mix(in oklab, var(--c-from, #fff) 80%, white);
+  --t-to: color-mix(in oklab, var(--c-to, #fff) 80%, white);
+  --t-soft: color-mix(in oklab, var(--c-from, #fff) 45%, white);
+}
+.tx-from,
+.tx-to,
+.tx-soft {
+  transition: color 0.6s ease;
+}
+.tx-from {
+  color: var(--t-from);
+}
+.tx-to {
+  color: var(--t-to);
+}
+.tx-soft {
+  color: var(--t-soft);
+}
+/*
+ * 渐变字：text-shadow 会盖在裁剪的背景上，阴影改用 drop-shadow。
+ * background-clip: text 只在元素盒子内上色，行高 1 时 p、g、y 的下伸部分和斜体的
+ * 左右出头会落到盒子外、变成透明（看起来像被截断）。这里用内边距把上色区域撑大，
+ * 再用等量负外边距抵消，布局尺寸与位置都不变。
+ */
+.tx-grad {
+  background-image: linear-gradient(100deg, var(--t-from), var(--t-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding: 0.2em 0.12em 0.35em;
+  margin: -0.2em -0.12em -0.35em;
+}
+
+/* 逐字浮现（短句切换） */
+@keyframes char-in {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(0.35em);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+.char-in {
+  display: inline-block;
+  white-space: pre;
+  opacity: 0;
+  animation: char-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* 背景缓慢漂移 */
+@keyframes kenburns {
+  0% {
+    transform: scale(1.06) translate3d(0, 0, 0);
+  }
+  50% {
+    transform: scale(1.1) translate3d(-1.2%, -0.8%, 0);
+  }
+  100% {
+    transform: scale(1.06) translate3d(0, 0, 0);
+  }
+}
+.kenburns {
+  animation: kenburns 60s ease-in-out infinite;
+}
+
+/* 海报轻微漂浮 */
+@keyframes float-y {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -10px;
+  }
+}
+.float-y {
+  animation: float-y 9s ease-in-out infinite;
+}
+
+input[type="range"].seek {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: 14px;
+  cursor: pointer;
+}
+input[type="range"].seek::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--from) 0%,
+    var(--to) var(--p),
+    rgba(255, 255, 255, 0.18) var(--p)
+  );
+}
+input[type="range"].seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 0 10px var(--from);
+}
+input[type="range"].seek::-moz-range-track {
+  height: 3px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+input[type="range"].seek::-moz-range-progress {
+  height: 3px;
+  border-radius: 9999px;
+  background: var(--from);
+}
+input[type="range"].seek::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 9999px;
+  background: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kenburns,
+  .float-y {
+    animation: none;
+  }
+}
