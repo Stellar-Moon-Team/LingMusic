@@ -74,7 +74,7 @@ export function parseMidi(buf: ArrayBuffer): MidiData {
       }
     };
     const voice = names.length; // 有音符时才占用这个声部号
-    const open = new Map<number, { tick: number; vel: number }[]>();
+    const open = new Map<number, { notes: { tick: number; vel: number }[]; head: number }>();
     let tick = 0;
     let status = 0;
     let name = "";
@@ -96,7 +96,8 @@ export function parseMidi(buf: ArrayBuffer): MidiData {
         else if (type === 0x58 && l >= 2) sigs.push({ tick, num: d[p]!, den: 2 ** d[p + 1]! });
         p += l;
       } else if (st === 0xf0 || st === 0xf7) {
-        p += vlq();
+        const l = vlq();
+        p += l;
       } else {
         const hi = st & 0xf0;
         const key = ((st & 0x0f) << 8) | d[p]!;
@@ -110,12 +111,18 @@ export function parseMidi(buf: ArrayBuffer): MidiData {
         if ((st & 0x0f) === 9) {
           // 第 10 通道（GM 打击乐）
         } else if (hi === 0x90 && b > 0) {
-          const stack = open.get(key) ?? [];
-          stack.push({ tick, vel: b });
-          open.set(key, stack);
+          const queue = open.get(key) ?? { notes: [], head: 0 };
+          queue.notes.push({ tick, vel: b });
+          open.set(key, queue);
         } else if (hi === 0x80 || hi === 0x90) {
-          const on = open.get(key)?.shift();
-          if (on) {
+          const queue = open.get(key);
+          if (queue && queue.head < queue.notes.length) {
+            const on = queue.notes[queue.head++]!;
+            if (queue.head === queue.notes.length) open.delete(key);
+            else if (queue.head >= 4096 && queue.head * 2 >= queue.notes.length) {
+              queue.notes = queue.notes.slice(queue.head);
+              queue.head = 0;
+            }
             raw.push({ tick: on.tick, endTick: tick, pitch: a, vel: on.vel, track: voice });
             hasNotes = true;
           }
@@ -123,8 +130,9 @@ export function parseMidi(buf: ArrayBuffer): MidiData {
       }
     }
     // 没收到 note-off 的音符收在轨道末尾
-    for (const [key, stack] of open)
-      for (const on of stack) {
+    for (const [key, queue] of open)
+      for (let i = queue.head; i < queue.notes.length; i++) {
+        const on = queue.notes[i]!;
         raw.push({ tick: on.tick, endTick: tick, pitch: key & 0xff, vel: on.vel, track: voice });
         hasNotes = true;
       }
