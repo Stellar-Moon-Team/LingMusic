@@ -48,13 +48,13 @@
 
 <table width="100%">
   <tr>
+  <td align="center" width="33%">
+      <img src="public/media/posters/qinling.png" width="100%" style="border-radius: 8px; max-width: 280px;" alt="Leisurely Moments 海报" />
+      <h4>Leisurely Moments<br><sub>闲 适 时 光</sub></h4>
+    </td>
     <td align="center" width="33%">
       <img src="public/media/posters/fengxue.png" width="100%" style="border-radius: 8px; max-width: 280px;" alt="Starscape 海报" />
       <h4>Starscape<br><sub>星 景</sub></h4>
-    </td>
-    <td align="center" width="33%">
-      <img src="public/media/posters/qinling.png" width="100%" style="border-radius: 8px; max-width: 280px;" alt="Leisurely Moments 海报" />
-      <h4>Leisurely Moments<br><sub>闲 适 时 光</sub></h4>
     </td>
     <td align="center" width="33%">
       <img src="public/media/posters/feiyu.png" width="100%" style="border-radius: 8px; max-width: 280px;" alt="Stolen Nap 海报" />
