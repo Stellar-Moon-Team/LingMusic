@@ -15,6 +15,8 @@ const KEY_GAP = 6;
 const PAD_Y = 8;
 /** 音域上下各留的空行 */
 const MARGIN = 2;
+const DENSE_WINDOW_NOTES = 4000;
+const MAX_INDIVIDUAL_SOUNDING_NOTES = 256;
 
 const BLACK = new Set([1, 3, 6, 8, 10]);
 
@@ -40,7 +42,7 @@ export class NoteRoll {
   private data: MidiData | null = null;
   /** 每个音高的键盘亮度（缓慢衰减） */
   private keyGlow = new Float32Array(128);
-  private keyTrack = new Int8Array(128);
+  private keyTrack = new Uint32Array(128);
   private lastNow = 0;
   /** 流速倍率（1 = 默认） */
   speed = 1;
@@ -124,38 +126,86 @@ export class NoteRoll {
     const noteH = Math.max(4, rowH * 1.25);
     const sounding: MidiNote[] = [];
     // 未发声的音符按声部合并成路径：过去的淡、未来的亮一些
-    const future: Path2D[] = trackColors.map(() => new Path2D());
-    const past: Path2D[] = trackColors.map(() => new Path2D());
-    for (let i = this.firstVisible(t0); i < notes.length; i++) {
+    const future: (Path2D | undefined)[] = [];
+    const past: (Path2D | undefined)[] = [];
+    const first = this.firstVisible(t0);
+    let left = first;
+    let right = notes.length;
+    while (left < right) {
+      const mid = (left + right) >> 1;
+      if (notes[mid]!.start <= t1) left = mid + 1;
+      else right = mid;
+    }
+    const merged = left - first > DENSE_WINDOW_NOTES ? new Map<string, MidiNote & { rightEdge: number }>() : null;
+    const addToPath = (n: MidiNote & { rightEdge?: number }) => {
+      const xa = xOf(n.start);
+      const xb = Math.max(xa + noteH, xOf(n.end), n.rightEdge ?? -Infinity);
+      const y = yOf(n.pitch) + (rowH - noteH) / 2;
+      const paths = n.end < t ? past : future;
+      const path = (paths[n.track] ??= new Path2D());
+      const r = Math.min(noteH / 2, (xb - xa) / 2);
+      path.roundRect(xa, y, xb - xa, noteH, r);
+    };
+    for (let i = first; i < left; i++) {
       const n = notes[i]!;
-      if (n.start > t1) break;
       if (n.end < t0) continue;
       if (n.start <= t && n.end >= t) {
         sounding.push(n);
         continue;
       }
-      const xa = xOf(n.start);
-      const xb = Math.max(xa + noteH, xOf(n.end));
-      const y = yOf(n.pitch) + (rowH - noteH) / 2;
-      const path = n.end < t ? past[n.track]! : future[n.track]!;
-      const r = Math.min(noteH / 2, (xb - xa) / 2);
-      path.roundRect(xa, y, xb - xa, noteH, r);
+      if (!merged) addToPath(n);
+      else {
+        const xa = xOf(n.start);
+        const col = Math.floor(Math.max(x0, Math.min(w, xa)) / noteH);
+        const key = `${n.track}:${n.pitch}:${n.end < t ? 0 : 1}:${col}`;
+        const rightEdge = Math.max(xa + noteH, xOf(n.end));
+        const prev = merged.get(key);
+        if (!prev) merged.set(key, { ...n, rightEdge });
+        else {
+          prev.start = Math.min(prev.start, n.start);
+          prev.end = Math.max(prev.end, n.end);
+          prev.rightEdge = Math.max(prev.rightEdge, rightEdge);
+        }
+      }
     }
+    if (merged) for (const n of merged.values()) addToPath(n);
 
     c.shadowBlur = 0;
     for (let k = 0; k < nTracks; k++) {
+      if (!past[k] && !future[k]) continue;
       c.fillStyle = trackColors[k]!;
-      c.globalAlpha = 0.3;
-      c.fill(past[k]!);
-      c.globalAlpha = 0.8;
-      c.shadowColor = trackColors[k]!;
-      c.shadowBlur = 8;
-      c.fill(future[k]!);
-      c.shadowBlur = 0;
+      if (past[k]) {
+        c.globalAlpha = 0.3;
+        c.fill(past[k]!);
+      }
+      if (future[k]) {
+        c.globalAlpha = 0.8;
+        c.shadowColor = trackColors[k]!;
+        c.shadowBlur = 8;
+        c.fill(future[k]!);
+        c.shadowBlur = 0;
+      }
     }
 
+    const active: (MidiNote & { hitStart?: number })[] = sounding.length > MAX_INDIVIDUAL_SOUNDING_NOTES
+      ? Array.from(sounding.reduce((byPitch, n) => {
+          const merged = byPitch.get(n.pitch);
+          if (!merged) byPitch.set(n.pitch, { ...n, hitStart: n.start });
+          else {
+            merged.start = Math.min(merged.start, n.start);
+            merged.end = Math.max(merged.end, n.end);
+            merged.hitStart = Math.max(merged.hitStart, n.start);
+            if (n.velocity > merged.velocity) {
+              merged.velocity = n.velocity;
+              merged.track = n.track;
+            }
+          }
+          return byPitch;
+        }, new Map<number, MidiNote & { hitStart: number }>()).values())
+      : sounding;
+
     // 发声中的音符：高亮 + 白芯 + 播放线上的光点
-    for (const n of sounding) {
+    for (const n of active) {
       const col = trackColors[n.track]!;
       const xa = xOf(n.start);
       const xb = Math.max(xa + noteH, xOf(n.end));
@@ -174,7 +224,7 @@ export class NoteRoll {
       roundRect(c, Math.max(xa, px - 40) + 1, y + noteH * 0.3, Math.max(2, Math.min(xb, px + 2) - Math.max(xa, px - 40) - 2), noteH * 0.4);
       c.fill();
 
-      const age = t - n.start;
+      const age = t - (n.hitStart ?? n.start);
       if (age < HIT) {
         const k = 1 - age / HIT;
         const cy = y + noteH / 2;
